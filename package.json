@@ -1,0 +1,28 @@
+{
+  "name": "minimal-http-server",
+  "version": "0.0.1",
+  "description": "Minimal http server written in native http module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "tsscmp": "^1.0.6",
+    "request": "2.88.0",
+    "body-parser": "^1.18.2"
+  },
+  "engines": {
+    "node": "7.6"
+  },
+  "repository": {
+    "url": "https://github.com/kosamari/minimal-http-server"
+  },
+  "license": "MIT",
+  "keywords": [
+    "node",
+    "glitch"
+  ],
+  "devDependencies": {
+    "express": "^4.17.1"
+  }
+}
