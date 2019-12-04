@@ -1,2 +1,0 @@
-# pooler
-Pooler slack app
