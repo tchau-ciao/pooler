@@ -109,7 +109,7 @@ function setInitialValues(modal, poolMessage, winnerMessage, title, users, chann
       }
     }
   })
-  console.log(users)
+  
   return modal
 }
 
@@ -123,7 +123,7 @@ app.get("/", function(req, res) {
 
 app.post("/interaction", (req, res) => {
   const { type, view } = JSON.parse(req.body.payload);
-  
+
   if (type === "view_submission") {
     var users = [];
     var channels = [];
@@ -140,7 +140,7 @@ app.post("/interaction", (req, res) => {
       if (state[p].hasOwnProperty("text_winner")) winnerMessage = state[p].text_winner.value
       if (state[p].hasOwnProperty("title")) title = state[p].title.value
     }
-    console.log(users)
+    
     // validate user input. if not valid, ask for new form submission
     if(winnerMessage.indexOf(c.WINNER_PLACEHOLDER) == -1){
       
