@@ -19,12 +19,14 @@ function randomUserSelect(users) {
 // select *number* users from the list (if number is less than users.length, returns the full list randomized)
 function randomUsersSelect(users, number) {
   let selectedUsers = []
-  let usersLength = users.length
+  let usersPool = []
+  users.forEach(user => {usersPool.push(user)})
+  let usersLength = usersPool.length
   for(let i = 0; i < number && i < usersLength; i++){
-    let user = randomUserSelect(users)
-    let index = users.indexOf(user);
+    let user = randomUserSelect(usersPool)
+    let index = usersPool.indexOf(user);
     if (index > -1) {
-      users.splice(index, 1);
+      usersPool.splice(index, 1);
     }
     selectedUsers.push(user)
   }
@@ -214,7 +216,7 @@ app.post("/interaction", (req, res) => {
     res.end(""); // confirm to the client that the form has valid data (ie. the modal can be closed and the request will be processed)
 
     // pick the winner
-    const winners = randomUsersSelect(users, number_winners) //  ##################### TODO ################ . replace '2' with input number
+    const winners = randomUsersSelect(users, number_winners)
     const winnersArr = getAllUsers(winners);
     
     let winnersString = ""

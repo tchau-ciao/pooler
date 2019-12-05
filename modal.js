@@ -95,7 +95,7 @@ module.exports = {
       element: {
         type: "plain_text_input",
         action_id: "text_winner",
-        initial_value: "The winner is ${USER}",
+        initial_value: "Congratulations ${PLACEHOLDER}, you are the winner(s)",
         multiline: false
       },
       label: {
