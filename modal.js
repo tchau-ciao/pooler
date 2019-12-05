@@ -1,4 +1,3 @@
-
 module.exports = {
   type: "modal",
   title: {
@@ -35,6 +34,22 @@ module.exports = {
     {
       type: "input",
       element: {
+        type: "plain_text_input",
+        action_id: "text",
+        placeholder: {
+          type: "plain_text",
+          text: "Type something for the candidates"
+        },
+        multiline: true
+      },
+      label: {
+        type: "plain_text",
+        text: "Text"
+      }
+    },
+    {
+      type: "input",
+      element: {
         type: "multi_channels_select",
         action_id: "channels",
         placeholder: {
@@ -54,7 +69,7 @@ module.exports = {
         action_id: "users",
         placeholder: {
           type: "plain_text",
-          text: "Type winners name"
+          text: "Type candidates name"
         }
       },
       label: {
@@ -66,12 +81,13 @@ module.exports = {
       type: "input",
       element: {
         type: "plain_text_input",
-        action_id: "text",
-        multiline: true
+        action_id: "number_winners",
+        initial_value: "1",
+        multiline: false
       },
       label: {
         type: "plain_text",
-        text: "Text"
+        text: "Number of Winners"
       }
     },
     {

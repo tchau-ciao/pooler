@@ -16,6 +16,21 @@ function randomUserSelect(users) {
   return users[Math.floor(Math.random() * users.length)];
 }
 
+// select *number* users from the list (if number is less than users.length, returns the full list randomized)
+function randomUsersSelect(users, number) {
+  let selectedUsers = []
+  let usersLength = users.length
+  for(let i = 0; i < number && i < usersLength; i++){
+    let user = randomUserSelect(users)
+    let index = users.indexOf(user);
+    if (index > -1) {
+      users.splice(index, 1);
+    }
+    selectedUsers.push(user)
+  }
+  return selectedUsers
+}
+
 // get info from user
 async function getUserInfo(user) {
   let { response, body } = await request.exec({
@@ -26,13 +41,11 @@ async function getUserInfo(user) {
 }
 
 // post winner message to channels
-function postWinnerMessage(winner, channels, title, message, userInfo) {
-  let jsonPayload = {
-    text: message,
-    as_user: false,
-    icon_emoji: ":tada",
-    attachments: [
-      {
+function postWinnerMessage(winnersInfo, channels, title, message) {
+  let attachments = []
+  
+  winnersInfo.forEach(userInfo => {
+    attachments.push({
         //pretext: message,
         color: '#36a64f',
         author_name: userInfo.real_name,
@@ -40,8 +53,14 @@ function postWinnerMessage(winner, channels, title, message, userInfo) {
         thumb_url: userInfo.profile.image_192,
         footer: title,
         ts: Date.now()
-      }
-    ]
+      })
+  })
+  
+  let jsonPayload = {
+    text: message,
+    as_user: false,
+    icon_emoji: ":tada",
+    attachments: attachments
   }
   postMessage(channels, jsonPayload)
 }
@@ -52,6 +71,7 @@ async function getAllUsers(candidates) {
   });
   return await Promise.all(promises);
 }
+
 
 // post message poolMessage to all channels
 function postPoolMessage(channels, title, message, candidates) {
@@ -97,7 +117,7 @@ function postMessage(channels, jsonPayload) {
 }
 
 // initialize the fields of the modal with the provided values
-function setInitialValues(modal, poolMessage, winnerMessage, title, users, channels){
+function setInitialValues(modal, poolMessage, winnerMessage, title, users, channels, number_winners){
   modal.blocks.forEach(block => {
     if(block.element !== undefined && block.element.action_id !== undefined){
       switch(block.element.action_id){
@@ -106,6 +126,7 @@ function setInitialValues(modal, poolMessage, winnerMessage, title, users, chann
         case 'text': block.element.initial_value = poolMessage; break;
         case 'text_winner': block.element.initial_value = winnerMessage; break;
         case 'title': block.element.initial_value = title; break;
+        case 'number_winners': block.element.initial_value = ""+number_winners; break;
       }
     }
   })
@@ -121,15 +142,24 @@ app.get("/", function(req, res) {
   res.send("");
 });
 
+app.post("/components", (req, res) => {
+  console.log("DYNAMIC COMPONENTS")
+  res.end("")
+})
+
+
 app.post("/interaction", (req, res) => {
   const { type, view } = JSON.parse(req.body.payload);
 
+  
   if (type === "view_submission") {
+    console.log("SUBMISSION")
     var users = [];
     var channels = [];
     var poolMessage = "";
     var winnerMessage = "";
     var title = "";
+    var number_winners = 1;
 
     // read input data
     const state = view.state.values;
@@ -139,16 +169,28 @@ app.post("/interaction", (req, res) => {
       if (state[p].hasOwnProperty("text")) poolMessage = state[p].text.value
       if (state[p].hasOwnProperty("text_winner")) winnerMessage = state[p].text_winner.value
       if (state[p].hasOwnProperty("title")) title = state[p].title.value
+      if (state[p].hasOwnProperty("number_winners")) number_winners = state[p].number_winners.value
     }
     
     // validate user input. if not valid, ask for new form submission
+    var errorMessage = null
     if(winnerMessage.indexOf(c.WINNER_PLACEHOLDER) == -1){
-      
+     errorMessage = `:exclamation: You must include the placeholder ${c.WINNER_PLACEHOLDER} in Winner Message`
+    }
+    
+    if(isNaN(number_winners) || parseInt(number_winners) <= 0){
+     errorMessage = c.NUM_WIN_ERROR
+    } else {
+     number_winners = parseInt(number_winners)
+    }
+    // if input is invalid, display error message
+    if(errorMessage !== null){
      // clone the modal
      var errorModal = JSON.parse(JSON.stringify(modal)); // clone the modal
       
      // preserving input data
-     errorModal = setInitialValues(errorModal, poolMessage, winnerMessage, title, users, channels)
+     errorModal = setInitialValues(
+       errorModal, poolMessage, winnerMessage, title, users, channels, number_winners)
       
      // add an error message 
      errorModal.blocks.push({
@@ -156,7 +198,7 @@ app.post("/interaction", (req, res) => {
         "text": {
           "type": "plain_text",
           "emoji": true,
-          "text": `:exclamation: You must include the placeholder ${c.WINNER_PLACEHOLDER} in Winner Message`
+          "text": errorMessage
         }
       })
       
@@ -172,22 +214,27 @@ app.post("/interaction", (req, res) => {
     res.end(""); // confirm to the client that the form has valid data (ie. the modal can be closed and the request will be processed)
 
     // pick the winner
-    const winner = randomUserSelect(users);
-
-    // get user info
-    const userInfo = getUserInfo(winner);
+    const winners = randomUsersSelect(users, number_winners) //  ##################### TODO ################ . replace '2' with input number
+    const winnersArr = getAllUsers(winners);
+    
+    let winnersString = ""
+    winners.forEach( function(w, index) {
+      this[index] = `<@${w}>`
+    }, winners);
+    winnersString = winners.join(',')
 
     // inject the user in the winnerMessage
-    winnerMessage = winnerMessage.replace(c.WINNER_PLACEHOLDER, `<@${winner}>`);
+    winnerMessage = winnerMessage.replace(c.WINNER_PLACEHOLDER, winnersString);
 
     postPoolMessage(channels, title, poolMessage, users);
 
     // wait POOL_TIMER before posting the winner
     setTimeout(() => {
-      userInfo.then(user => {
-        postWinnerMessage(winner, channels, title, winnerMessage, user);
+      winnersArr.then(winnersInfo => {
+        postWinnerMessage(winnersInfo, channels, title, winnerMessage, users);
       })
     }, c.POOL_TIMEOUT);
+
   }
 });
 
