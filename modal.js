@@ -79,11 +79,8 @@ module.exports = {
       element: {
         type: "plain_text_input",
         action_id: "text_winner",
-        placeholder: {
-          type: "plain_text",
-          text: "The winner is ${USER}"
-        },
-        multiline: true
+        initial_value: "The winner is ${USER}",
+        multiline: false
       },
       label: {
         type: "plain_text",
