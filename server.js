@@ -101,8 +101,8 @@ function setInitialValues(modal, poolMessage, winnerMessage, title, users, chann
   modal.blocks.forEach(block => {
     if(block.element !== undefined && block.element.action_id !== undefined){
       switch(block.element.action_id){
-        case 'users': block.element.initial_value = users; break;
-        case 'channels': block.element.initial_value = channels; break;
+        case 'users': block.element.initial_users = users; break;
+        case 'channels': block.element.initial_channels = channels; break;
         case 'text': block.element.initial_value = poolMessage; break;
         case 'text_winner': block.element.initial_value = winnerMessage; break;
         case 'title': block.element.initial_value = title; break;
