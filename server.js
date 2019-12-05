@@ -156,7 +156,7 @@ app.post("/interaction", (req, res) => {
         "text": {
           "type": "plain_text",
           "emoji": true,
-          "text": `:exclamation: You must include the placeholder ${this.WINNER_PLACEHOLDER} in Winner Message`
+          "text": `:exclamation: You must include the placeholder ${c.WINNER_PLACEHOLDER} in Winner Message`
         }
       })
       
