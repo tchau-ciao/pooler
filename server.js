@@ -1,10 +1,4 @@
 // server.js
-// This is a minimal HTTP server written in Node's native http module
-
-// this is Node.js native modules
-//const http = require('http') // handles http connection
-//const url = require('url')   // used to parse url strings
-//const path = require('path') // used to inspect & create filepath
 
 var express = require("express");
 const bodyParser = require("body-parser");
@@ -14,9 +8,8 @@ var app = express();
 app.use(express.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 
-const winnerPlaceholder = '${USER}'
-
 const modal = require("./modal");
+const c = require("./constants");
 
 // random pick one user from the array
 function randomUserSelect(users) {
@@ -27,41 +20,30 @@ function randomUserSelect(users) {
 async function getUserInfo(user) {
   let { response, body } = await request.exec({
     url: "https://slack.com/api/users.info?user=" + user,
-    headers: {
-      Authorization: "Bearer " + process.env.SLACK_ACCESS_TOKEN
-    }
+    headers: c.HEADERS
   });
   return JSON.parse(body).user;
 }
 
 // post winner message to channels
 function postWinnerMessage(winner, channels, title, message, userInfo) {
-  channels.forEach(ch => {
-    request.exec({
-      method: "POST",
-      url: "https://slack.com/api/chat.postMessage",
-      headers: {
-        Authorization: "Bearer " + process.env.SLACK_ACCESS_TOKEN
-      },
-      json: {
-        channel: ch,
-        text: message,
-        as_user: false,
-        icon_emoji: ":tada",
-        attachments: [
-          {
-            //pretext: message,
-            color: '#36a64f',
-            author_name: userInfo.real_name,
-            author_icon: userInfo.profile.image_48,
-            thumb_url: userInfo.profile.image_192,
-            footer: title,
-            ts: Date.now()
-          }
-        ]
+  let jsonPayload = {
+    text: message,
+    as_user: false,
+    icon_emoji: ":tada",
+    attachments: [
+      {
+        //pretext: message,
+        color: '#36a64f',
+        author_name: userInfo.real_name,
+        author_icon: userInfo.profile.image_48,
+        thumb_url: userInfo.profile.image_192,
+        footer: title,
+        ts: Date.now()
       }
-    });
-  });
+    ]
+  }
+  postMessage(channels, jsonPayload)
 }
 
 async function getAllUsers(candidates) {
@@ -71,40 +53,64 @@ async function getAllUsers(candidates) {
   return await Promise.all(promises);
 }
 
-// post message to channels
+// post message poolMessage to all channels
 function postPoolMessage(channels, title, message, candidates) {
   const candidatesArr = getAllUsers(candidates);
-  var users = ""
+  let users = ""
   candidatesArr.then(arr => {
     arr.forEach(user => {
       users = users.concat(`<@${user.id}>\n`)
     });
+    
+    let jsonPayload = {
+      text: `*${title}*`,
+      as_user: false,
+      icon_emoji: ":tada",
+      attachments: [
+        {
+          pretext: message,
+          text: users,
+          color: '#36a64f'
+        }
+      ]
+    }
+    postMessage(channels, jsonPayload)
+  });
+}
 
+
+
+// post message to channels
+function postMessage(channels, jsonPayload) {
     channels.forEach(ch => {
-      request
-        .exec({
+      // set channel name
+      jsonPayload.channel = ch
+      
+      // send message
+      request.exec({
           method: "POST",
           url: "https://slack.com/api/chat.postMessage",
-          headers: {
-            Authorization: "Bearer " + process.env.SLACK_ACCESS_TOKEN
-          },
-          json: {
-            channel: ch,
-            text: `*${title}*`,
-            as_user: false,
-            icon_emoji: ":tada",
-            attachments: [
-              {
-                pretext: message,
-                text: users,
-                color: '#36a64f'
-              }
-            ]
-          }
-        })
-        .then(res => {});
+          headers: c.HEADERS,
+          json: jsonPayload
+        }).then(res => {});
     });
-  });
+}
+
+// initialize the fields of the modal with the provided values
+function setInitialValues(modal, poolMessage, winnerMessage, title, users, channels){
+  modal.blocks.forEach(block => {
+    if(block.element !== undefined && block.element.action_id !== undefined){
+      switch(block.element.action_id){
+        case 'users': block.element.initial_value = users; break;
+        case 'channels': block.element.initial_value = channels; break;
+        case 'text': block.element.initial_value = poolMessage; break;
+        case 'text_winner': block.element.initial_value = winnerMessage; break;
+        case 'title': block.element.initial_value = title; break;
+      }
+    }
+  })
+  
+  return modal
 }
 
 /*
@@ -125,50 +131,63 @@ app.post("/interaction", (req, res) => {
     var winnerMessage = "";
     var title = "";
 
+    // read input data
     const state = view.state.values;
     for (var p in state) {
-      if (state[p].hasOwnProperty("users")) {
-        users = state[p].users.selected_users;
-      }
-
-      if (state[p].hasOwnProperty("channels")) {
-        channels = state[p].channels.selected_channels;
-      }
-
-      if (state[p].hasOwnProperty("text")) {
-        poolMessage = state[p].text.value;
-      }
-
-      if (state[p].hasOwnProperty("text_winner")) {
-        winnerMessage = state[p].text_winner.value;
-      }
-
-      if (state[p].hasOwnProperty("title")) {
-        title = state[p].title.value;
-      }
+      if (state[p].hasOwnProperty("users")) users = state[p].users.selected_users
+      if (state[p].hasOwnProperty("channels")) channels = state[p].channels.selected_channels
+      if (state[p].hasOwnProperty("text")) poolMessage = state[p].text.value
+      if (state[p].hasOwnProperty("text_winner")) winnerMessage = state[p].text_winner.value
+      if (state[p].hasOwnProperty("title")) title = state[p].title.value
     }
     
-    if(winnerMessage.indexOf(winnerPlaceholder) == -1){
-     console.log("ERR: missing winnerPlaceholder")
-    } 
-    res.end("");
+    // validate user input. if not valid, ask for new form submission
+    if(winnerMessage.indexOf(c.WINNER_PLACEHOLDER) == -1){
+      
+     // clone the modal
+     var errorModal = JSON.parse(JSON.stringify(modal)); // clone the modal
+      
+     // preserving input data
+     errorModal = setInitialValues(errorModal, poolMessage, winnerMessage, title, users, channels)
+      
+     // add an error message 
+     errorModal.blocks.push({
+        "type": "section",
+        "text": {
+          "type": "plain_text",
+          "emoji": true,
+          "text": `:exclamation: You must include the placeholder ${this.WINNER_PLACEHOLDER} in Winner Message`
+        }
+      })
+      
+     // update the view
+     res.json({
+      "response_action": "update",
+      "view": errorModal
+     })
+     return // end processing and wait for new form submission
+    }
+    
+    
+    res.end(""); // confirm to the client that the form has valid data (ie. the modal can be closed and the request will be processed)
 
     // pick the winner
     const winner = randomUserSelect(users);
 
-    // get user info and post the message
+    // get user info
     const userInfo = getUserInfo(winner);
-    
 
-    winnerMessage = winnerMessage.replace(winnerPlaceholder, `<@${winner}>`);
+    // inject the user in the winnerMessage
+    winnerMessage = winnerMessage.replace(c.WINNER_PLACEHOLDER, `<@${winner}>`);
 
     postPoolMessage(channels, title, poolMessage, users);
 
+    // wait POOL_TIMER before posting the winner
     setTimeout(() => {
       userInfo.then(user => {
         postWinnerMessage(winner, channels, title, winnerMessage, user);
       })
-    }, 3000);
+    }, c.POOL_TIMEOUT);
   }
 });
 
@@ -176,9 +195,7 @@ async function openModal(dialog) {
   const view = await request.exec({
     method: "POST",
     url: "https://slack.com/api/views.open",
-    headers: {
-      Authorization: "Bearer " + process.env.SLACK_ACCESS_TOKEN
-    },
+    headers: c.HEADERS,
     json: dialog
   });
 
@@ -198,5 +215,5 @@ app.post("/pool", (req, res) => {
 });
 
 app.listen(process.env.PORT, function() {
-  console.log("Example app listening on port 3000!");
+  console.log("Pooler listening on port 3000!");
 });
