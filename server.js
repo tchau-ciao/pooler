@@ -101,15 +101,15 @@ function setInitialValues(modal, poolMessage, winnerMessage, title, users, chann
   modal.blocks.forEach(block => {
     if(block.element !== undefined && block.element.action_id !== undefined){
       switch(block.element.action_id){
-        case 'users': block.element.initial_value = users; break;
-        case 'channels': block.element.initial_value = channels; break;
+        case 'users': block.element.initial_users = users; break;
+        case 'channels': block.element.initial_channels = channels; break;
         case 'text': block.element.initial_value = poolMessage; break;
         case 'text_winner': block.element.initial_value = winnerMessage; break;
         case 'title': block.element.initial_value = title; break;
       }
     }
   })
-  
+  console.log(users)
   return modal
 }
 
@@ -123,7 +123,7 @@ app.get("/", function(req, res) {
 
 app.post("/interaction", (req, res) => {
   const { type, view } = JSON.parse(req.body.payload);
-
+  
   if (type === "view_submission") {
     var users = [];
     var channels = [];
@@ -140,7 +140,7 @@ app.post("/interaction", (req, res) => {
       if (state[p].hasOwnProperty("text_winner")) winnerMessage = state[p].text_winner.value
       if (state[p].hasOwnProperty("title")) title = state[p].title.value
     }
-    
+    console.log(users)
     // validate user input. if not valid, ask for new form submission
     if(winnerMessage.indexOf(c.WINNER_PLACEHOLDER) == -1){
       
